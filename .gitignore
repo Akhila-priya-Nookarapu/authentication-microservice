@@ -1,0 +1,25 @@
+# Encrypted seed (sensitive) — DO NOT commit
+encrypted_seed.txt
+
+# Python cache / bytecode
+__pycache__/
+*.pyc
+
+# Environment files
+.env
+
+# IDE/editor settings
+.vscode/
+.idea/
+
+# Logs
+*.log
+data/*.log
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Docker config / local overrides (if any)
+.env.local
+.local.env
