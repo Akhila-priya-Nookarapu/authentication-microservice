@@ -1,42 +1,41 @@
 from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
-import base64, time, os
-
-from fastapi.middleware.cors import CORSMiddleware
-
-app = FastAPI()
-
-# ✅ Allow all origins for Swagger testing
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
+import base64, os, time
 
 from totp.totp_utils import generate_totp_code, verify_totp_code
 
 app = FastAPI()
 
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Load private key ONCE
+with open("data/student_private.pem", "rb") as f:
+    PRIVATE_KEY = serialization.load_pem_private_key(f.read(), password=None)
+
+# ---- Decrypt Seed ----
+
 class DecryptRequest(BaseModel):
     encrypted_seed: str
 
 @app.post("/decrypt-seed")
-async def decrypt_seed(request: DecryptRequest):
+async def decrypt_seed_endpoint(req: DecryptRequest):
     try:
-        key_path = os.path.join("data", "student_private.pem")
-        with open(key_path, "rb") as key_file:
-            private_key = serialization.load_pem_private_key(
-                key_file.read(),
-                password=None
-            )
-        cipher_bytes = base64.b64decode(request.encrypted_seed)
-        plaintext = private_key.decrypt(
+        # 1. Base64 decode
+        cipher_bytes = base64.b64decode(req.encrypted_seed)
+
+        # 2. RSA decrypt (OAEP with SHA256)
+        plaintext = PRIVATE_KEY.decrypt(
             cipher_bytes,
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
@@ -44,48 +43,56 @@ async def decrypt_seed(request: DecryptRequest):
                 label=None
             )
         )
-        seed = plaintext.decode('utf-8').strip()
-        if len(seed) != 64 or not all(c in '0123456789abcdef' for c in seed.lower()):
-            raise ValueError("Invalid seed format")
-        seed_path = os.path.join("data", "seed.txt")
-        with open(seed_path, "w") as f:
-            f.write(seed)
-    except Exception:
+
+        # 3. Convert to string
+        seed = plaintext.decode("utf-8").strip()
+
+        # 4. Validate 64-char hex
+        if len(seed) != 64 or any(c not in "0123456789abcdef" for c in seed.lower()):
+            return JSONResponse(status_code=400, content={"error": "Invalid seed format"})
+
+        # 5. Save
+        with open("data/seed.txt", "w") as f:
+            f.write(seed + "\n")
+
+        return {"seed": seed}
+
+    except Exception as e:
+        print("Decrypt Error:", e)
         return JSONResponse(status_code=500, content={"error": "Decryption failed"})
-    return {"status": "ok"}
+
+
+# ---- Generate TOTP ----
 
 @app.get("/generate-2fa")
 async def generate_2fa():
-    seed_path = os.path.join("data", "seed.txt")
     try:
-        with open(seed_path, "r") as f:
+        with open("data/seed.txt", "r") as f:
             seed = f.read().strip()
-        if len(seed) != 64 or not all(c in '0123456789abcdef' for c in seed.lower()):
-            raise FileNotFoundError
-    except Exception:
+    except:
         return JSONResponse(status_code=500, content={"error": "Seed not decrypted yet"})
+
     code = generate_totp_code(seed)
     now = int(time.time())
     valid_for = 30 - (now % 30)
     return {"code": code, "valid_for": valid_for}
 
+
+# ---- Verify TOTP ----
+
 @app.post("/verify-2fa")
 async def verify_2fa(payload: dict = Body(...)):
     try:
         code = payload.get("code")
-        if code is None:
+        if not code:
             return JSONResponse(status_code=400, content={"error": "Missing code"})
 
-        seed_path = os.path.join("data", "seed.txt")
-        with open(seed_path, "r") as f:
+        with open("data/seed.txt", "r") as f:
             seed = f.read().strip()
-        if len(seed) != 64 or not all(c in '0123456789abcdef' for c in seed.lower()):
-            raise ValueError("Invalid seed format")
 
         valid = verify_totp_code(seed, code, valid_window=1)
         return {"valid": valid}
 
     except Exception as e:
-        print("🚨 ERROR in /verify-2fa:", str(e))  # 🧪 This will show in your terminal
+        print("Verify Error:", e)
         return JSONResponse(status_code=500, content={"error": "Internal server error"})
-
