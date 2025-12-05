@@ -1,0 +1,8 @@
+# Force cron job file to use LF
+cron/2fa-cron text eol=lf
+
+# Keep PEM files LF (recommended)
+*.pem text eol=lf
+
+# Keep log files LF
+*.log text eol=lf

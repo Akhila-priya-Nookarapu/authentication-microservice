@@ -1,0 +1,1 @@
+* * * * * echo "Cron is running at $(date)" >> /data/cron.log
