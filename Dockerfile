@@ -14,17 +14,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
 COPY --from=builder /wheels /wheels
 COPY requirements.txt .
 RUN pip install --no-index --find-links=/wheels -r requirements.txt
 
 COPY . .
 
-COPY cron/cronjob /cron/cronjob
-RUN chmod 0644 /cron/cronjob && crontab /cron/cronjob
+# IMPORTANT: use correct cron file
+COPY cron/2fa-cron /cron/2fa-cron
+RUN chmod 0644 /cron/2fa-cron && crontab /cron/2fa-cron
 
 VOLUME ["/data", "/cron"]
 
 EXPOSE 8080
-CMD ["bash", "-c", "cron && tail -f /var/log/cron.log & uvicorn app:app --host 0.0.0.0 --port 8080"]
 
+CMD ["bash", "-c", "cron && tail -f /var/log/cron.log & uvicorn app:app --host 0.0.0.0 --port 8080"]
