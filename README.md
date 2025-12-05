@@ -1,9 +1,3 @@
-# authentication-microservice
-Here is a **clean, professional, ready-to-paste README.md** for your GitHub repository.
-It is written exactly in the format instructors expect and covers everything you implemented.
-
----
-
 # **PKI + TOTP Authentication Microservice**
 
 A secure, containerized authentication microservice implementing **RSA 4096-bit PKI**, **TOTP-based 2FA**, **FastAPI**, **Docker**, and **cron automation**.
