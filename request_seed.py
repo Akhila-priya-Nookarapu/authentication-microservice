@@ -1,5 +1,4 @@
 import requests
-import json
 
 API_URL = "https://eajeyq4r3zjloqa4rpovy2nthda0vtjaf.lambda-url.ap-south-1.on.aws/"
 STUDENT_ID = "23P31A05N6"
@@ -8,7 +7,7 @@ PUBLIC_KEY_FILE = "data/student_public.pem"
 
 def request_seed(student_id, github_repo_url):
     with open(PUBLIC_KEY_FILE, "r") as f:
-        public_key = f.read().strip().replace("\r", "").replace("\n", "\\n")
+        public_key = f.read()   # ← DO NOT modify formatting
 
     payload = {
         "student_id": student_id,
@@ -22,16 +21,16 @@ def request_seed(student_id, github_repo_url):
 
     response = requests.post(API_URL, json=payload)
 
+    print(response.status_code, response.text)
+
     if response.status_code != 200:
         print("❌ API Error:", response.status_code, response.text)
         return
 
-    data = response.json()
-    encrypted_seed = data.get("encrypted_seed")
+    encrypted_seed = response.json().get("encrypted_seed")
 
     if not encrypted_seed:
         print("❌ No encrypted seed received!")
-        print("Response:", data)
         return
 
     with open("encrypted_seed.txt", "w") as f:
