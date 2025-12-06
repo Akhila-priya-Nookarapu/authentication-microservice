@@ -23,3 +23,7 @@ Thumbs.db
 # Docker config / local overrides (if any)
 .env.local
 .local.env
+
+data/student_private.pem
+data/seed.txt
+encrypted_seed.txt
